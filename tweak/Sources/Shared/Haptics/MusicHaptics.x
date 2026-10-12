@@ -240,20 +240,34 @@ static float strength(void) {
 }
 
 static BOOL startEngine(void) {
-    static BOOL supported, checked;
     static double retryAt;
-    if (!checked) {
-        checked = YES;
-        supported = CHHapticEngine.capabilitiesForHardware.supportsHaptics;
-        if (!supported) SGLog(@"music haptics: this device has no Taptic Engine for Core Haptics");
+    // The capability is asked again rather than cached: a container can answer no at launch and yes
+    // once its guest app is on screen, and a no remembered forever would keep Music Haptics dead.
+    static BOOL complained;
+    if (!CHHapticEngine.capabilitiesForHardware.supportsHaptics) {
+        if (!complained) {
+            complained = YES;
+            SGLog(@"music haptics: this device has no Taptic Engine for Core Haptics");
+        }
+        return NO;
     }
-    if (!supported) return NO;
     NSError *error = nil;
     if (!sg_engine) {
         // Spotify's own session rather than a new one, and haptics only, so nothing touches its audio.
+        // Inside a container (LiveContainer and the like) the guest app does not own the audio session,
+        // so that initialiser can hand back nil; the engine is then built without one, which is all
+        // haptics-only playback needs, rather than giving the feature up.
         sg_engine = [[CHHapticEngine alloc] initWithAudioSession:AVAudioSession.sharedInstance error:&error];
         if (!sg_engine) {
+            SGLog(@"music haptics: no engine on Spotify's audio session (%@), trying one without", error);
+            error = nil;
+            sg_engine = [[CHHapticEngine alloc] initAndReturnError:&error];
+        }
+        if (!sg_engine) {
+            // Discarded rather than kept, so the next event tries to build one again instead of this
+            // nil being the last word for the rest of the launch.
             SGLog(@"music haptics: no haptic engine: %@", error);
+            retryAt = hostSeconds(mach_absolute_time()) + kStartRetryAfter;
             return NO;
         }
         sg_engine.playsHapticsOnly = YES;
@@ -279,6 +293,12 @@ static BOOL startEngine(void) {
         retryAt = now + kStartRetryAfter;
         static int logged;
         if (logged++ < 3) SGLog(@"music haptics: the engine did not start: %@", error);
+        // An engine that would not start is thrown away, so the next try builds a fresh one: a container
+        // can refuse the first engine and allow the next, and keeping the dead one would never retry it.
+        if (!sg_engineRunning) {
+            sg_engine = nil;
+            atomic_store(&sg_engineStopped, false);
+        }
         return NO;
     }
     sg_engineRunning = YES;
@@ -490,6 +510,9 @@ static void updateListening(void) {
 void SGSetMusicHapticsEnabled(BOOL on) {
     if (!sg_wake) return;
     atomic_store(&sg_enabled, on);
+    // A container can swallow the foreground notification, so ask the app itself; a switch flipped on
+    // while Spotify is on screen must start listening even if the note never came.
+    if (on) atomic_store(&sg_active, UIApplication.sharedApplication.applicationState != UIApplicationStateBackground);
     updateListening();
 }
 
@@ -512,14 +535,27 @@ void SGMusicHapticsSettingsChanged(void) {
     mach_timebase_info_data_t timebase;
     mach_timebase_info(&timebase);
     sg_secondsPerTick = (double)timebase.numer / timebase.denom / 1e9;
-    static const SGAudioProcessor processor = {readFormat, rendered};
-    if (!SGAudioPipelineRegister(SGAudioStageHaptics, &processor)) return;
+    // The state the switch and the player thread need comes first, so a registration that fails below
+    // leaves the switch working (it just has no audio to follow) instead of the whole feature dead and
+    // silent: everything downstream is gated on sg_wake.
     sg_wake = dispatch_semaphore_create(0);
     readSettings();
     atomic_store(&sg_enabled, SGFlag(SGKeyMusicHaptics, NO));
+    atomic_store(&sg_active, UIApplication.sharedApplication.applicationState != UIApplicationStateBackground);
+    static const SGAudioProcessor processor = {readFormat, rendered};
+    if (!SGAudioPipelineRegister(SGAudioStageHaptics, &processor)) {
+        // Spotify's AudioOutputUnitStart could not be rebound (a container whose process layout differs,
+        // for one), so nothing will reach the analyzer and no haptics can play. Say so rather than
+        // returning quietly, which used to leave the switch doing nothing with no clue why.
+        SGLog(@"music haptics: Spotify's output could not be tapped (rebind failed); Music Haptics will not play");
+    }
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
     [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
         atomic_store(&sg_active, true);
+        // By the first foreground the whole app is loaded, so a rebind that could not find Spotify's
+        // output at launch (a container that loads it late) gets another try here.
+        static const SGAudioProcessor retryProcessor = {readFormat, rendered};
+        if (!SGAudioPipelineAvailable()) SGAudioPipelineRegister(SGAudioStageHaptics, &retryProcessor);
         updateListening();
     }];
     [center addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {

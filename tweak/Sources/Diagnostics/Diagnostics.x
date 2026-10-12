@@ -3,9 +3,18 @@
 // the background or the full player appears.
 #import "Core/SGCore.h"
 #import "Diagnostics.h"
+#import <CoreHaptics/CoreHaptics.h>
 #import <sys/socket.h>
 #import <netinet/in.h>
 #import <unistd.h>
+
+// Declared here rather than imported: Diagnostics is a leaf layer and may only reach Core (see
+// scripts/check-layers.sh). The keys below are Haptics.h's, written out because that header lives in
+// Shared/; keep them in step with it.
+#define SGKeyMusicHapticsDiag @"spotifyglass.haptics.music"
+#include <stdbool.h>
+bool SGAudioPipelineAvailable(void);
+bool SGAudioPipelineTapped(void);
 
 static const uint16_t kTreePort = 8085;
 
@@ -159,6 +168,13 @@ static void startTreeServer(void) {
     %init;
     SGRequireClasses(@[@"_TtC21NowPlaying_ScrollImpl23NPVScrollViewController"]);
     SGLog(@"loaded, UIGlassEffect %@", NSClassFromString(@"UIGlassEffect") ? @"available" : @"missing");
+    // Music Haptics is the one feature with several silent ways to do nothing (the audio tap, the Taptic
+    // Engine, the switch, and a reset's stock marker), so its readiness is stated once at launch: the
+    // lines that follow name which of them is missing instead of the feature just being quiet.
+    SGLog(@"music haptics: switch %@, Taptic Engine %@, Spotify's output %@",
+          SGFlag(SGKeyMusicHapticsDiag, NO) ? @"on" : @"off",
+          CHHapticEngine.capabilitiesForHardware.supportsHaptics ? @"available" : @"missing",
+          SGAudioPipelineTapped() ? @"tapped" : (SGAudioPipelineAvailable() ? @"not tapped yet" : @"untappable"));
     if (SGIsDebugBuild()) {
         [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
             SGDumpScreen(@"on background");

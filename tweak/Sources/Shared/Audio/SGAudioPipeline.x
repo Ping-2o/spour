@@ -354,21 +354,31 @@ static OSStatus dispose(AudioComponentInstance unit) {
 }
 
 static void install(void) {
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
+    // Not dispatch_once: an attempt made before Spotify's image is loaded (a container may load it
+    // after the tweak) would fail and lock the failure in for the process. Once it has succeeded there
+    // is nothing left to do, so later calls return at once.
+    static atomic_bool installed;
+    if (atomic_load(&installed)) return;
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&lock);
+    if (!atomic_load(&installed)) {
         SGAudioSourceQueueInitialize();
-        if (!SGRebindImport("AudioOutputUnitStart", start, (void **)&originalStart) || !originalStart) {
+        if (SGRebindImport("AudioOutputUnitStart", start, (void **)&originalStart) && originalStart) {
+            atomic_store(&available, true);
+            if (!SGRebindImport("AudioComponentInstanceDispose", dispose, (void **)&originalDispose)) originalDispose = NULL;
+            if (!SGRebindImport("AudioUnitSetProperty", setProperty, (void **)&originalSet) || !originalSet) {
+                originalSet = NULL;
+                SGLog(@"audio pipeline: mixer import unavailable; output processing only");
+            }
+            atomic_store(&installed, true);
+        } else {
+            // Spotify's output import is not there yet; leave `installed` off so the next caller tries
+            // again rather than the pipeline being unavailable for the whole launch.
             originalStart = NULL;
             SGLog(@"audio pipeline: Spotify output import unavailable");
-            return;
         }
-        atomic_store(&available, true);
-        if (!SGRebindImport("AudioComponentInstanceDispose", dispose, (void **)&originalDispose)) originalDispose = NULL;
-        if (!SGRebindImport("AudioUnitSetProperty", setProperty, (void **)&originalSet) || !originalSet) {
-            originalSet = NULL;
-            SGLog(@"audio pipeline: mixer import unavailable; output processing only");
-        }
-    });
+    }
+    pthread_mutex_unlock(&lock);
 }
 bool SGAudioPipelineRegister(SGAudioStage stage, const SGAudioProcessor *processor) {
     if (stage >= SGAudioStageCount || stage < 0 || !processor) return false;

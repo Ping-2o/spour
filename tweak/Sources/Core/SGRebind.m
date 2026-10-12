@@ -3,15 +3,54 @@
 #import <mach-o/loader.h>
 #import <mach-o/nlist.h>
 #import <string.h>
+#import <strings.h>
 #import "SGRebind.h"
 #import "SGLog.h"
 
-static const struct mach_header_64 *mainExecutable(intptr_t *slide) {
+// The image that holds the import: Spotify's own binary. On a normal install that is the main
+// executable, but a container (LiveContainer and the like) runs the host app as the executable and
+// loads Spotify as a dylib, so every loaded image is walked rather than the executable alone -- which
+// is why the audio output import used to be unavailable there and Music Haptics never played.
+// Returns the image whose __got or __la_symbol_ptr holds the symbol, and its slide.
+static const struct mach_header_64 *imageWithSymbol(const char *symbol, intptr_t *slide) {
     for (uint32_t i = 0; i < _dyld_image_count(); i++) {
         const struct mach_header *header = _dyld_get_image_header(i);
-        if (header->magic != MH_MAGIC_64 || header->filetype != MH_EXECUTE) continue;
-        *slide = _dyld_get_image_vmaddr_slide(i);
-        return (const struct mach_header_64 *)header;
+        if (header->magic != MH_MAGIC_64) continue;
+        // The mod's own dylibs (spotifyglass.dylib, SpotifyGlassAppGroups.dylib) import the same system
+        // calls; repointing their slots would send the mod's own calls through the replacement. Skip
+        // them, and only them: any other image is a candidate for the symbol.
+        const char *name = _dyld_get_image_name(i);
+        if (name && strcasestr(name, "spotifyglass")) continue;
+        const struct mach_header_64 *image = (const struct mach_header_64 *)header;
+        intptr_t imageSlide = _dyld_get_image_vmaddr_slide(i);
+
+        const struct segment_command_64 *linkedit = NULL;
+        const struct symtab_command *symtab = NULL;
+        const struct dysymtab_command *dysymtab = NULL;
+        const struct load_command *command = (const struct load_command *)(image + 1);
+        for (uint32_t c = 0; c < image->ncmds; c++, command = (const struct load_command *)((const char *)command + command->cmdsize)) {
+            if (command->cmd == LC_SEGMENT_64 && strcmp(((const struct segment_command_64 *)command)->segname, SEG_LINKEDIT) == 0) {
+                linkedit = (const struct segment_command_64 *)command;
+            } else if (command->cmd == LC_SYMTAB) {
+                symtab = (const struct symtab_command *)command;
+            } else if (command->cmd == LC_DYSYMTAB) {
+                dysymtab = (const struct dysymtab_command *)command;
+            }
+        }
+        if (!linkedit || !symtab || !dysymtab || !dysymtab->nindirectsyms) continue;
+
+        uintptr_t base = (uintptr_t)imageSlide + (uintptr_t)(linkedit->vmaddr - linkedit->fileoff);
+        const struct nlist_64 *symbols = (const struct nlist_64 *)(base + symtab->symoff);
+        const char *strings = (const char *)(base + symtab->stroff);
+        for (uint32_t u = dysymtab->iundefsym; u < dysymtab->iundefsym + dysymtab->nundefsym && u < symtab->nsyms; u++) {
+            uint32_t offset = symbols[u].n_un.n_strx;
+            if (offset >= symtab->strsize) continue;
+            const char *name = strings + offset;
+            if (name[0] == '_' && strcmp(name + 1, symbol) == 0) {
+                *slide = imageSlide;
+                return image;
+            }
+        }
     }
     return NULL;
 }
@@ -33,7 +72,7 @@ static BOOL writeSlot(void **slot, void *value, BOOL readOnly) {
 
 BOOL SGRebindImport(const char *symbol, void *replacement, void **original) {
     intptr_t slide = 0;
-    const struct mach_header_64 *header = mainExecutable(&slide);
+    const struct mach_header_64 *header = imageWithSymbol(symbol, &slide);
     if (!header) return NO;
 
     const struct segment_command_64 *linkedit = NULL;
