@@ -163,8 +163,9 @@ Shared:
                   in the unit's output format (the hardware's), they go through a drum
                   and bass analyzer on the render thread (SGMusicAnalyzer.m, plain C), and a thread of its own schedules
                   the taps and the rumble for when the sound is heard, at their strength and leaving out what Follows
-                  leaves out (MusicHaptics.x). Everything applies at once; nothing plays while Spotify is not the active
-                  app. The analyzer is scored on the Mac against harness/haptics/, the hook in the simulator against its
+                  leaves out (MusicHaptics.x). Everything applies at once, and the taps and the rumble follow the music into
+                  the background, for an app whose audio session keeps playing: the sound stopping is what stops them. The
+                  analyzer is scored on the Mac against harness/haptics/, the hook in the simulator against its
                   sim/, the settings against harness/haptics-page/
     LiveActivity/ a Live Activity on the lock screen and in the Dynamic Island in one of three views, the line being
                   sung with the next one under it, the tracks up next (a tap on one skipping ahead to it), or a control

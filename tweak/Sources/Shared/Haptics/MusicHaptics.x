@@ -18,9 +18,13 @@
 // applies to the next event.
 //
 // The rebinding and the notify are in place under either look, so the switch works at once;
-// with the switch off the notify returns straight away. Nothing listens while Spotify is not the active
-// app, since iOS plays no haptics for an app in the background. Sound that is not Spotify's own
-// output (Connect, AirPlay to another device, video) never passes the unit, and plays no haptics.
+// with the switch off the notify returns straight away. Listening is not held back to the foreground:
+// the sound itself is the gate, since Core Haptics keeps playing for an app whose audio session is,
+// the way Apple Music's Music Haptics follows its music onto the lock screen. The sound stopping is
+// what stops the haptics: the events end, the rumble goes quiet over its wait, the engine over its own.
+// Sound that is not Spotify's own output (Connect, AirPlay to another device, video) never passes
+// the unit, and plays no haptics. An engine the system will not start while backgrounded (it may only
+// be started in the foreground) is retried while the events keep coming, and catches at the unlock.
 //
 // Threading: the notify runs on the render thread and only touches atomics, the analyzer and the
 // ring; the Core Haptics objects belong to the player thread; the switch, its settings and the app's
@@ -60,7 +64,7 @@ enum { kRingSize = 1024, kMonoFrames = 4096 };
 
 #pragma mark - shared between the threads
 
-static atomic_bool sg_enabled, sg_active, sg_listening;
+static atomic_bool sg_enabled, sg_listening;
 static atomic_uint sg_generation;
 static atomic_uint_fast64_t sg_latencyBits;
 static atomic_uint sg_lastFrames;
@@ -489,7 +493,12 @@ static void readLatency(void) {
 }
 
 static void updateListening(void) {
-    BOOL listening = atomic_load(&sg_enabled) && atomic_load(&sg_active);
+    // The switch is the only gate. The foreground used to be one, on the belief that iOS plays no
+    // haptics for a background app, but Core Haptics keeps playing while the app's audio session is
+    // active: Spotify playing in the background keeps its session, so the taps and the rumble follow
+    // the music onto the lock screen and into other apps, the way Apple Music's Music Haptics does.
+    // No sound renders, no events arrive, and the engine is shut down after its idle wait anyway.
+    BOOL listening = atomic_load(&sg_enabled);
     if (atomic_exchange(&sg_listening, listening) == listening) return;
     if (listening) {
         atomic_fetch_add(&sg_generation, 1);
@@ -510,9 +519,6 @@ static void updateListening(void) {
 void SGSetMusicHapticsEnabled(BOOL on) {
     if (!sg_wake) return;
     atomic_store(&sg_enabled, on);
-    // A container can swallow the foreground notification, so ask the app itself; a switch flipped on
-    // while Spotify is on screen must start listening even if the note never came.
-    if (on) atomic_store(&sg_active, UIApplication.sharedApplication.applicationState != UIApplicationStateBackground);
     updateListening();
 }
 
@@ -541,7 +547,6 @@ void SGMusicHapticsSettingsChanged(void) {
     sg_wake = dispatch_semaphore_create(0);
     readSettings();
     atomic_store(&sg_enabled, SGFlag(SGKeyMusicHaptics, NO));
-    atomic_store(&sg_active, UIApplication.sharedApplication.applicationState != UIApplicationStateBackground);
     static const SGAudioProcessor processor = {readFormat, rendered};
     if (!SGAudioPipelineRegister(SGAudioStageHaptics, &processor)) {
         // Spotify's AudioOutputUnitStart could not be rebound (a container whose process layout differs,
@@ -551,15 +556,12 @@ void SGMusicHapticsSettingsChanged(void) {
     }
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
     [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
-        atomic_store(&sg_active, true);
         // By the first foreground the whole app is loaded, so a rebind that could not find Spotify's
-        // output at launch (a container that loads it late) gets another try here.
+        // output at launch (a container that loads it late) gets another try here; this is also what
+        // first turns listening on for a switch already stored on, since the constructor only stores it.
         static const SGAudioProcessor retryProcessor = {readFormat, rendered};
         if (!SGAudioPipelineAvailable()) SGAudioPipelineRegister(SGAudioStageHaptics, &retryProcessor);
-        updateListening();
-    }];
-    [center addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
-        atomic_store(&sg_active, false);
+        // An engine the system refused to start while backgrounded catches here, when it may again.
         updateListening();
     }];
     [center addObserverForName:AVAudioSessionRouteChangeNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
