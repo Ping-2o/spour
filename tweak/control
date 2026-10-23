@@ -1,7 +1,7 @@
 Package: com.spotipw
-Name: Taurus
+Name: Spour
 Architecture: iphoneos-arm
 Description: Liquid Glass for the Spotify iOS app
-Maintainer: Taurus
-Author: Taurus
+Maintainer: Ping-2o
+Author: Ping-2o (continuing Taurus by samj. and chroma.pw by darkk)
 Section: Tweaks

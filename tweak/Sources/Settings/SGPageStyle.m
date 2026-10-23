@@ -208,7 +208,7 @@ UIViewController *SGTopController(void) {
     return top;
 }
 
-NSString *const SGRepoURL = @"https://github.com/samj-exe/taurus";
+NSString *const SGRepoURL = @"https://github.com/Ping-2o/spour";
 
 void SGOpenURL(NSString *url) {
     NSURL *target = url ? [NSURL URLWithString:url] : nil;

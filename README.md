@@ -2,9 +2,9 @@
   <img src="docs/icon.png" width="96" alt="">
 </p>
 
-<h1 align="center">taurus.</h1>
+<h1 align="center">spour.</h1>
 
-<p align="center">Open-Sourced fork of chroma.pw with built-in Spotify Premium. </p>
+<p align="center">Open-sourced Liquid Glass Spotify tweak with built-in Spotify Premium. </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/iOS-000000?style=for-the-badge&logo=ios&logoColor=white" alt="iOS">
@@ -28,7 +28,7 @@
   <img src="docs/screenshots/home.webp" width="16%" alt="Home">
 </p>
 
-## Taurus: the free, open-sourced liquid glass spotify tweak - made my me. <3
+## Spour: the free, open-sourced liquid glass Spotify tweak
 
 A no-jailbreak Theos tweak that rebuilds Spotify for iOS in Liquid Glass, injected into your own
 decrypted IPA and signed with your own certificate.
@@ -49,15 +49,15 @@ in Settings → Mod Settings.
 ## Install it
 
 Each
-[release](https://github.com/samj-exe/taurus/releases) carries the tweak's `.ipa`, install this `.ipa` file with any sideloader, such as SideStore or Feather. You do not need to build to project if you do not wish to.
+[release](https://github.com/Ping-2o/spour/releases) carries the tweak's `.ipa`, install this `.ipa` file with any sideloader, such as SideStore or Feather. You do not need to build to project if you do not wish to.
 
-Add the release source to [SideStore or Feather](https://raw.githubusercontent.com/samj-exe/taurus/stable/altstore-source.json), or add the [ESign source](https://raw.githubusercontent.com/samj-exe/taurus/stable/esign-source.json) in ESign.
+Add the release source to [SideStore or Feather](https://raw.githubusercontent.com/Ping-2o/spour/stable/altstore-source.json), or add the [ESign source](https://raw.githubusercontent.com/Ping-2o/spour/stable/esign-source.json) in ESign.
 
 ## Build it
 
 Bring a decrypted **Spotify 9.1.78** IPA; you get an unsigned
-`Taurus-<mod version>.ipa` to sign with SideStore, Feather or any certificate signer. Each
-[release](https://github.com/samj-exe/taurus/releases) also carries the tweak's `.deb`.
+`Spour-<mod version>.ipa` to sign with SideStore, Feather or any certificate signer. Each
+[release](https://github.com/Ping-2o/spour/releases) also carries the tweak's `.deb`.
 
 #### Build with GitHub Actions (recommended)
 
@@ -75,7 +75,7 @@ alone builds too, but without the Live Activity. Then:
 
 Put the decrypted `.ipa` in `ipa/`, then:
 
-    make release    # out/Taurus-<version>.ipa, ready to sign
+    make release    # out/Spour-<version>.ipa, ready to sign
     make install    # the same, signed with your certificate and pushed over USB
 
 `make install` reads `SIGN_P12`, `SIGN_PROFILE` and `SIGN_P12_PASSWORD` from `.signing.env`; copy
@@ -100,16 +100,19 @@ contribution; it is ticked once, before the first pull request is merged.
 
 ## Star history
 
-<a href="https://star-history.com/#samj-exe/taurus&Date">
+<a href="https://star-history.com/#Ping-2o/spour&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=samj-exe/taurus&type=Date&theme=dark">
-    <img src="https://api.star-history.com/svg?repos=samj-exe/taurus&type=Date" alt="Star history chart">
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Ping-2o/spour&type=Date&theme=dark">
+    <img src="https://api.star-history.com/svg?repos=Ping-2o/spour&type=Date" alt="Star history chart">
   </picture>
 </a>
 
 ## Credits
 
-chroma.pw/spoti.pw by darkk
+Spour stands on the work of the projects it came from, with thanks:
+
+- **[Taurus](https://github.com/samj-exe/taurus)** by **samj.** — the Liquid Glass fork this project continues, and most of the code here.
+- **[chroma.pw / spoti.pw](https://github.com/skopevoj/spoti.pw)** by **darkk** and Vojtěch Škopek — the original open-sourced Spotify tweak Taurus itself forked.
 
 [cyan](https://github.com/asdfzxcvbn/pyzule-rw) injects, [Theos](https://theos.dev) builds, and
 [FLEX](https://github.com/FLEXTool/FLEX), as hopeless's AutoFLEX build in `vendor/`, is the inspector

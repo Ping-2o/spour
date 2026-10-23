@@ -22,7 +22,7 @@ concurrency:
 jobs:
   cla:
     if: >-
-      github.repository == 'skopevoj/spoti.pw' && (github.event_name == 'pull_request_target' ||
+      github.repository == 'Ping-2o/spour' && (github.event_name == 'pull_request_target' ||
       (github.event.issue.pull_request && (contains(github.event.comment.body, 'agree to it') ||
       github.event.comment.body == 'recheck')))
     runs-on: ubuntu-latest
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const OWNER_LOGIN = 'skopevoj';
+            const OWNER_LOGIN = 'Ping-2o';
             const CLA_VERSION = '1.0';
             const SENTENCE = 'i have read the cla and i agree to it';
             const TICKED = /^\s*[-*]\s*\[[xX]\]\s*I agree to the \[?Contributor License Agreement/m;
