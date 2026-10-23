@@ -169,12 +169,17 @@ static void startTreeServer(void) {
     SGRequireClasses(@[@"_TtC21NowPlaying_ScrollImpl23NPVScrollViewController"]);
     SGLog(@"loaded, UIGlassEffect %@", NSClassFromString(@"UIGlassEffect") ? @"available" : @"missing");
     // Music Haptics is the one feature with several silent ways to do nothing (the audio tap, the Taptic
-    // Engine, the switch, and a reset's stock marker), so its readiness is stated once at launch: the
-    // lines that follow name which of them is missing instead of the feature just being quiet.
-    SGLog(@"music haptics: switch %@, Taptic Engine %@, Spotify's output %@",
-          SGFlag(SGKeyMusicHapticsDiag, NO) ? @"on" : @"off",
-          CHHapticEngine.capabilitiesForHardware.supportsHaptics ? @"available" : @"missing",
-          SGAudioPipelineTapped() ? @"tapped" : (SGAudioPipelineAvailable() ? @"not tapped yet" : @"untappable"));
+    // Engine, the switch, and a reset's stock marker), so its readiness is stated once: the lines that
+    // follow name which of them is missing instead of the feature just being quiet. Not here, though --
+    // no feature's %ctor has registered the audio pipeline yet at this point, so its output would read
+    // untappable however well it works; the state is read once the app has had its first foreground,
+    // when registration and the pipeline's late retry have both been and gone.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        SGLog(@"music haptics: switch %@, Taptic Engine %@, Spotify's output %@",
+              SGFlag(SGKeyMusicHapticsDiag, NO) ? @"on" : @"off",
+              CHHapticEngine.capabilitiesForHardware.supportsHaptics ? @"available" : @"missing",
+              SGAudioPipelineTapped() ? @"tapped" : (SGAudioPipelineAvailable() ? @"not tapped yet (nothing has played)" : @"untappable"));
+    });
     if (SGIsDebugBuild()) {
         [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
             SGDumpScreen(@"on background");

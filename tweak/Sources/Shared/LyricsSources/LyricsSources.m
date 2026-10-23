@@ -83,6 +83,18 @@ static id jsonIn(NSData *body) {
     return body.length ? [NSJSONSerialization JSONObjectWithData:body options:0 error:nil] : nil;
 }
 
+NSInteger SGLyricsIntIn(id value) {
+    return [value isKindOfClass:NSNumber.class] ? [value integerValue] : 0;
+}
+
+double SGLyricsDoubleIn(id value) {
+    return [value isKindOfClass:NSNumber.class] ? [value doubleValue] : 0;
+}
+
+BOOL SGLyricsBoolIn(id value) {
+    return [value isKindOfClass:NSNumber.class] ? [value boolValue] : NO;
+}
+
 void SGLyricsGetJSON(NSURL *url, NSDictionary<NSString *, NSString *> *headers, void (^done)(id root)) {
     send(requestFor(url, headers), ^(NSData *body) {
         done(jsonIn(body));

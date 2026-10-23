@@ -252,7 +252,7 @@ static SGLyricsResult *withTrack(SGLyricsResult *lyrics, id track) {
     if ([title isKindOfClass:NSString.class]) result.title = title;
     if ([artist isKindOfClass:NSString.class]) result.artist = artist;
     if ([album isKindOfClass:NSString.class]) result.album = album;
-    result.seconds = [track[@"track_length"] integerValue];
+    result.seconds = SGLyricsIntIn(track[@"track_length"]);
     result.instrumental = truthy(track[@"instrumental"]);
     return result;
 }
@@ -271,7 +271,7 @@ static void ask(NSString *trackID, BOOL renewToken) {
             @"optional_calls": @"track.richsync",
             @"richsync_compact_type": @"words",
         }, ^(NSDictionary *message) {
-            NSInteger status = [dig(message, @"header/status_code") integerValue];
+            NSInteger status = SGLyricsIntIn(dig(message, @"header/status_code"));
             if (status == 401 && renewToken) {
                 SGLog(@"musixmatch: token no longer accepted (hint %@), asking for a new one", dig(message, @"header/hint"));
                 [NSUserDefaults.standardUserDefaults removeObjectForKey:kTokenKey];

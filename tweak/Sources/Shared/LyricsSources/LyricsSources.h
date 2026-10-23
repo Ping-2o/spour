@@ -104,6 +104,12 @@ void SGLyricsGetText(NSURL *url, void (^done)(NSString *text));
 // For the one source that is asked a question rather than sent to an address. body is anything
 // NSJSONSerialization writes; nothing is sent at all when it is not.
 void SGLyricsPostJSON(NSURL *url, NSDictionary<NSString *, NSString *> *headers, id body, void (^done)(id root));
+// A number or a truth out of JSON a lyrics API sent. A field it leaves null comes back as NSNull,
+// which answers no selector, so a value that is not an NSNumber reads as its zero and a bool as NO
+// rather than crashing the app (lrclib leaves `duration` null on recordings it has no length for).
+NSInteger SGLyricsIntIn(id value);
+double SGLyricsDoubleIn(id value);
+BOOL SGLyricsBoolIn(id value);
 // Every source's reply goes through this, so a walk that lost a request to the network or a busy
 // server is not kept as "no lyrics". The two above call it themselves.
 void SGLyricsNoteReply(NSURLResponse *response, NSError *error);

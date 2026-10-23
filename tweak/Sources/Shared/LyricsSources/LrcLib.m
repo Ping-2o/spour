@@ -67,7 +67,7 @@ static NSArray<SGKaraokeLine *> *linesFromLRC(NSString *lrc) {
 static SGLyricsResult *resultFrom(NSDictionary *record) {
     if (![record isKindOfClass:NSDictionary.class]) return nil;
     SGLyricsResult *result = [SGLyricsResult new];
-    result.instrumental = [record[@"instrumental"] boolValue];
+    result.instrumental = SGLyricsBoolIn(record[@"instrumental"]);
     if (result.instrumental) return result;
     id synced = record[@"syncedLyrics"], plain = record[@"plainLyrics"];
     NSArray<SGKaraokeLine *> *lines = [synced isKindOfClass:NSString.class] ? linesFromLRC(synced) : nil;
@@ -104,8 +104,8 @@ static BOOL betterRecord(NSDictionary *record, NSDictionary *best, NSInteger sec
     BOOL wasSynced = [best[@"syncedLyrics"] isKindOfClass:NSString.class] && [best[@"syncedLyrics"] length];
     if (synced != wasSynced) return synced;
     if (seconds > 0) {
-        NSInteger off = labs((NSInteger)[record[@"duration"] doubleValue] - seconds);
-        NSInteger wasOff = labs((NSInteger)[best[@"duration"] doubleValue] - seconds);
+        NSInteger off = labs(SGLyricsIntIn(record[@"duration"]) - seconds);
+        NSInteger wasOff = labs(SGLyricsIntIn(best[@"duration"]) - seconds);
         return off < wasOff;
     }
     NSString *text = record[@"syncedLyrics"] ?: record[@"plainLyrics"] ?: @"";
@@ -117,7 +117,7 @@ static NSDictionary *bestOf(id found, NSInteger seconds) {
     NSDictionary *best = nil;
     for (NSDictionary *record in [found isKindOfClass:NSArray.class] ? found : @[]) {
         if (![record isKindOfClass:NSDictionary.class]) continue;
-        NSInteger length = (NSInteger)[record[@"duration"] doubleValue];
+        NSInteger length = SGLyricsIntIn(record[@"duration"]);
         if (seconds > 0 && length > 0 && labs(length - seconds) > kLengthSlack) continue;
         if (betterRecord(record, best, seconds)) best = record;
     }

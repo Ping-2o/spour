@@ -261,7 +261,7 @@ static NSArray<SGKaraokeWord *> *wordsFrom(NSArray *syllables) {
     for (id raw in syllables ?: @[]) {
         NSDictionary *syllable = dictionaryIn(raw);
         if (!syllable) continue;
-        BOOL runsOn = [syllable[@"IsPartOfWord"] boolValue];
+        BOOL runsOn = SGLyricsBoolIn(syllable[@"IsPartOfWord"]);
         id text = syllable[@"Text"];
         NSString *said = [text isKindOfClass:NSString.class]
             ? [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet] : nil;
@@ -307,7 +307,7 @@ static NSArray<SGKaraokeLine *> *linesFromSyllables(NSArray *content) {
         line.backing = lineFrom(backing, nil, nil);
         // The far side of a duet. The API says outright which lines belong to the second voice, so
         // unlike TTML there are no voices here to work an alignment out from.
-        if ([vocal[@"OppositeAligned"] boolValue] || [lead[@"OppositeAligned"] boolValue]) {
+        if (SGLyricsBoolIn(vocal[@"OppositeAligned"]) || SGLyricsBoolIn(lead[@"OppositeAligned"])) {
             line.align = SGKaraokeAlignTrailing;
         }
         [lines addObject:line];
@@ -369,7 +369,7 @@ SGLyricsAsk SGSpicyLyricsAsk = ^(SGLyricsQuery *query, void (^done)(SGLyricsResu
     NSDictionary *headers = @{@"Authorization": [@"Bearer " stringByAppendingString:key], @"Accept": @"application/json"};
     SGLyricsGetJSON(url, headers, ^(id root) {
         NSDictionary *envelope = dictionaryIn(root);
-        NSInteger status = [envelope[@"Status"] integerValue];
+        NSInteger status = SGLyricsIntIn(envelope[@"Status"]);
         if (status && status != 200) {
             SGLog(@"spicy: %@ API status %ld", query.trackID, (long)status);
             done(nil);

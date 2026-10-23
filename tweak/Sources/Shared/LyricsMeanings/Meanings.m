@@ -1,6 +1,7 @@
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Headers/SPTPlayer.h"
+#import "Shared/LyricsSources/LyricsSources.h"
 #import "Meanings.h"
 
 static NSString *const kSearch = @"https://genius.com/api/search/song";
@@ -149,10 +150,11 @@ static NSNumber *songIn(NSDictionary *response, NSString *title, NSString *artis
 }
 
 // By the annotation, not the referent: a referent the artist spoke to is "verified" as a whole, the
-// editors' annotations under it too.
+// editors' annotations under it too. A field Genius leaves null answers no selector, so the booleans
+// are read the way the lyrics sources read theirs.
 static SGLyricsMeaningAuthor authorOf(NSDictionary *annotation) {
     NSString *state = stringIn(annotation[@"state"]);
-    if ([annotation[@"verified"] boolValue] || [state isEqualToString:@"verified"]) return SGLyricsMeaningByArtist;
+    if (SGLyricsBoolIn(annotation[@"verified"]) || [state isEqualToString:@"verified"]) return SGLyricsMeaningByArtist;
     if ([state isEqualToString:@"accepted"]) return SGLyricsMeaningByEditors;
     return SGLyricsMeaningByCommunity;
 }
@@ -160,12 +162,12 @@ static SGLyricsMeaningAuthor authorOf(NSDictionary *annotation) {
 static void addMeanings(NSDictionary *response, NSMutableArray<SGLyricsMeaning *> *into) {
     id referents = response[@"referents"];
     for (NSDictionary *referent in [referents isKindOfClass:NSArray.class] ? referents : @[]) {
-        if (![referent isKindOfClass:NSDictionary.class] || [referent[@"is_description"] boolValue]) continue;
+        if (![referent isKindOfClass:NSDictionary.class] || SGLyricsBoolIn(referent[@"is_description"])) continue;
         NSString *fragment = stringIn(referent[@"fragment"]);
         id annotations = referent[@"annotations"];
         if (!fragment.length || ![annotations isKindOfClass:NSArray.class]) continue;
         for (NSDictionary *annotation in annotations) {
-            if (![annotation isKindOfClass:NSDictionary.class] || [annotation[@"deleted"] boolValue]) continue;
+            if (![annotation isKindOfClass:NSDictionary.class] || SGLyricsBoolIn(annotation[@"deleted"])) continue;
             if ([stringIn(annotation[@"state"]) isEqualToString:@"rejected"]) continue;
             id body = annotation[@"body"];
             NSString *text = [stringIn([body isKindOfClass:NSDictionary.class] ? body[@"plain"] : nil)
